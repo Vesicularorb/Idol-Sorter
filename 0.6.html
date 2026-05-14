@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Idol Ranker Pro - Master Database Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<style>
+    body { background-color: #0f172a; color: #f3f4f6; overflow-x: hidden; user-select: none; scroll-behavior: smooth; }
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 5px; }
+
+    #workspace { display: flex; width: 100%; padding-top: 35px; padding-bottom: 80vh; position: relative; }
+    #ranking-column { flex: 1; padding-left: 30px; max-width: 1750px; }
+    #ranking-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%; }
+
+    #tool-column { position: fixed; right: 340px; top: 30px; width: 430px; display: flex; flex-direction: row; gap: 0; z-index: 9999; transition: opacity 0.2s ease, visibility 0.2s ease; }
+    #tool-column.hidden-by-tray { opacity: 0; visibility: hidden; pointer-events: none; }
+    #shift-tool { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 6px 10px; display: flex; flex-direction: row; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; }
+    
+    #rolodex-sidebar { width: 300px; height: calc(100vh - 60px); position: fixed; right: 20px; top: 40px; background: #1e293b; border: 2px solid #334155; border-radius: 12px; display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 50; }
+    #rolodex-header { padding: 10px; border-bottom: 2px solid #334155; font-weight: 900; color: #6366f1; text-transform: uppercase; font-size: 0.75rem; }
+    #rolodex-list { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; }
+
+    #holding-cell { position: fixed; right: 340px; top: 80px; width: 430px; height: calc(100vh - 120px); background: #1e293b; border: 2px solid #4f46e5; border-radius: 12px; display: flex; flex-direction: column; z-index: 499; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    #holding-cell-header { padding: 6px 10px; border-bottom: 2px solid #334155; font-weight: 900; color: #6366f1; text-transform: uppercase; font-size: 0.65rem; text-align: center; flex-shrink: 0; letter-spacing: 0.1em; }
+    #holding-cell-pool { flex: 1; overflow-y: auto; padding: 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start; }
+    #holding-cell-pool .idol-card { flex-direction: column; align-items: center; padding: 2px; width: 100%; height: auto; gap: 2px; }
+    #holding-cell-pool .card-identity { width: 100%; height: auto; flex-direction: column-reverse; align-items: center; }
+    #holding-cell-pool .idol-name { font-size: 10px; height: auto; line-height: 1.1; }
+    #holding-cell-pool .img-tray { width: 100%; height: 85px; object-fit: cover; }
+    #holding-cell-pool .img-tray:hover { transform: scale(1) !important; transition: none !important; z-index: 1 !important; box-shadow: none !important; cursor: grab; }
+    
+    .shift-input { background: #020617; border: 1px solid #4f46e5; border-radius: 6px; padding: 6px 8px; text-align: center; color: white; font-weight: 900; width: 60px; font-size: 14px; outline: none; flex-shrink: 0; }
+    .shift-btn { background: #4f46e5; color: white; font-size: 10px; font-weight: 800; padding: 7px 10px; border-radius: 6px; text-transform: uppercase; border-bottom: 3px solid #312e81; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .shift-btn:hover { background: #6366f1; }
+    .shift-label { font-size: 9px; font-weight: 900; color: #a5b4fc; text-transform: uppercase; white-space: nowrap; flex-shrink: 0; }
+
+    .rolodex-item { padding: 6px 8px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; gap: 8px; }
+    .rolodex-num { color: #6366f1; font-weight: bold; width: 30px; }
+
+    .rank-slot { height: 138px; background-color: #1e293b !important; border: 2px solid #334155; display: flex; align-items: center; border-radius: 12px; overflow: visible; position: relative; }
+    .rank-slot:hover { z-index: 100; }
+    .rank-number-box { width: 50px; background-color: #020617; color: #6366f1; border-right: 2px solid #334155; font-size: 1.4rem; font-weight: 900; display: flex; justify-content: center; align-items: center; height: 100%; flex-shrink: 0; }
+    .divider-bar { grid-column: span 4; height: 4px; background: linear-gradient(90deg, transparent, #4f46e5, transparent); margin: 10px 0 20px 0; opacity: 0.8; }
+    
+    .card-note { flex: 1; height: 100%; display: flex; align-items: center; padding: 6px 4px; min-width: 0; }
+    .card-note textarea { width: 100%; height: 100px; background: #020617; border: 1px solid #334155; border-radius: 6px; color: #94a3b8; font-size: 11px; padding: 6px 8px; resize: none; outline: none; font-family: monospace; line-height: 1.4; }
+    .card-note textarea:focus { border-color: #4f46e5; color: #e2e8f0; }
+    .card-note textarea::placeholder { color: #475569; font-style: italic; }
+    
+    .rank-target { flex: 1; height: 100%; display: flex; flex-direction: row; align-items: flex-start; padding: 5px 8px; gap: 12px; min-width: 0; overflow: visible; }
+    .idol-card { display: flex; flex-direction: row; align-items: center; gap: 4px; width: 100%; height: 100%; position: relative; backface-visibility: hidden; transform: translateZ(0); will-change: transform; }
+    .card-identity { display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-end; text-align: center; width: 80px; height: 130px; flex-shrink: 0; margin-top: 2px; }
+    .idol-name { width: 100%; font-size: 12px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; color: #cbd5e1; line-height: 1.1; text-align: center; height: 24px; display: flex; align-items: center; justify-content: center; }
+
+    .img-tray { width: 75px; height: 105px; object-fit: cover; border-radius: 6px; background: #334155; transition: transform 0.2s; position: relative; z-index: 1; }
+	.img-tray:hover { 
+        transform: scale(3.0); 
+        transition-delay: 0.1s; 
+        /* These lines fix the "behind others" issue */
+        z-index: 999999 !important; 
+        position: relative; 
+        box-shadow: 0 0 60px rgba(0,0,0,1); 
+    }
+    body.library-dragging .img-tray:hover {
+        transform: scale(1) !important;
+        transition: none !important;
+        z-index: 1 !important;
+        box-shadow: none !important;
+        transition-delay: 0s !important;
+    }
+    .img-rank { width: 78px; height: 105px; object-fit: cover; border-radius: 8px; transition: transform 0.2s; position: relative; z-index: 1; }
+	.img-rank:hover { 
+        transform: scale(2.5); 
+        transition-delay: 0.1s; 
+        /* These lines fix the "behind others" issue */
+        z-index: 999999 !important; 
+        position: relative; 
+        box-shadow: 0 0 20px rgba(0,0,0,1); 
+    }
+    
+    #tray { position: fixed; bottom: 0; left: 0; width: 100%; background: #0f172a; border-top: 3px solid #6366f1; z-index: 9000; display: flex; flex-direction: column; overflow: visible !important; transition: transform 0.3s ease-out; height: 350px; }
+    #resizer { height: 4px; cursor: ns-resize; background: #4f46e5; width: 100%; flex-shrink: 0; }
+    .tray-header { background-color: #0f172a; padding: 2px 0.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; height: 32px; position: relative; z-index: -1; }
+    
+    #idol-pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; padding: 5px; overflow-y: auto; flex-grow: 1; overflow-x: visible !important; contain: initial !important; clip-path: none !important; }
+    .group-wrapper { border-left: 4px solid transparent; margin-bottom: 1rem; overflow: visible !important; position: relative; z-index: 1; overflow: visible !important;}
+    .group-wrapper:hover { z-index: 50; }
+    .group-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; overflow: visible !important; }
+    .group-wrapper h2 { text-align: center; border-left: none !important; padding-left: 0 !important; }
+
+    /* Group Colors */
+    .header-akb48 h2 { color: #ff69b4 !important; border-left: none !important; }
+    .header-nmb48 h2 { color: #ff4500 !important; border-left: none !important; }
+    .header-nogizaka46 h2 { color: #7d3c98 !important; border-left: none !important; }
+    .header-hinatazaka46 h2 { color: #89cff0 !important; border-left: none !important; }
+    .header-ske48 h2 { color: #facc15 !important; border-left: none !important; } 
+    .header-hkt48 h2 { color: #f472b6 !important; border-left: none !important; } 
+    .header-sakurazaka46 h2 { color: #4c1d95 !important; border-left: none !important; } 
+    .header-keyakizaka46 h2 { color: #064e3b !important; border-left: none !important; } 
+    .header-bokuao h2 { color: #60a5fa !important; border-left: none !important; } 
+    .header-ngt48 h2 { color: #ef4444 !important; border-left: none !important; } 
+    .header-stu48 h2 { color: #bae6fd !important; border-left: none !important; } 
+    .header-bababambi h2 { color: #ec4899 !important; border-left: none !important; } 
+
+    .header-morningmusume h2 { background: linear-gradient(to bottom, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; border-left: none !important; font-weight: 900; }
+    .header-nijicon h2 { background: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; border-left: none !important; font-weight: 900; filter: drop-shadow(0px 0px 1px rgba(255,255,255,0.3)); }
+    
+    .sortable-ghost { opacity: 0.4; background: #4f46e5 !important; }
+	.group-wrapper:hover {
+        z-index: 999999;
+        position: relative;
+    }
+
+    .idol-card:hover {
+        z-index: 1000;
+        position: relative;
+    }
+	
+    </style>
+</head>
+<body>
+    <header class="fixed top-0 w-full bg-slate-950 border-b border-slate-800 z-[210] p-1 flex justify-between items-center h-[30px]">
+        <h1 class="text-sm font-black text-indigo-400 italic uppercase ml-4 tracking-tight">Idol Ranker Pro</h1>
+        <div class="flex gap-2 mr-4">
+            <button onclick="toggleTray()" id="header-open-btn" class="px-2 py-0.5 bg-indigo-600 text-white rounded font-bold text-[9px] uppercase hidden">Open Library</button>
+            <button onclick="undoLast()" id="undo-btn" class="px-2 py-0.5 bg-slate-700 text-slate-400 rounded font-bold text-[9px] uppercase" title="Undo last action (Ctrl+Z)" disabled>↩ Undo</button>
+            <button onclick="saveData()" class="px-2 py-0.5 bg-green-600 text-white rounded font-bold text-[9px] uppercase">Save</button>
+            <button onclick="exportList()" class="px-2 py-0.5 bg-blue-600 text-white rounded font-bold text-[9px] uppercase">Export</button>
+            <button onclick="clearAll()" class="px-2 py-0.5 bg-slate-800 text-white rounded font-bold text-[9px] uppercase">Reset</button>
+        </div>
+    </header>
+
+    <div id="workspace">
+        <main id="ranking-column"><div id="ranking-container"></div></main>
+        
+        <div id="tool-column">
+            <div id="shift-tool">
+                <span class="shift-label">Shift Target</span>
+                <input type="number" id="shift-target" class="shift-input" placeholder="#" min="1" max="200">
+                <button class="shift-btn" onclick="massShift('up')">UP ↑</button>
+                <button class="shift-btn" onclick="massShift('down')">DOWN ↓</button>
+            </div>
+        </div>
+
+        <div id="holding-cell">
+            <div id="holding-cell-header" style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;">
+                <span>⬇ Holding Cell</span>
+                <button onclick="startHoldingCellSort()" style="background:#f59e0b;color:#1c1917;border:none;border-bottom:2px solid #b45309;border-radius:6px;padding:3px 8px;font-size:0.6rem;font-weight:900;text-transform:uppercase;cursor:pointer;letter-spacing:0.05em;white-space:nowrap;">⚖ Sort Cell</button>
+            </div>
+            <div id="holding-cell-pool" class="custom-scrollbar"></div>
+        </div>
+
+        <aside id="rolodex-sidebar">
+            <div id="rolodex-header">Current Order</div>
+            <div id="rolodex-list" class="custom-scrollbar"></div>
+        </aside>
+    </div>
+
+    <div id="tray" class="flex flex-col">
+        <div id="resizer"></div>
+        <div class="tray-header">
+            <div class="flex items-center gap-6 px-4">
+                <span class="font-bold text-indigo-300 uppercase text-[10px]">Idol Library</span>
+                <input type="text" id="search" placeholder="Search..." class="px-3 py-1 bg-slate-950 border border-slate-700 rounded-full text-xs w-64 text-white outline-none">
+            </div>
+            <button onclick="toggleTray()" class="px-5 py-1 bg-indigo-600 text-white rounded-full font-bold text-[10px] uppercase">Minimize</button>
+        </div>
+        <div id="idol-pool" class="custom-scrollbar"></div>
+    </div>
+
+    <script>
+        const gh_main = "https://raw.githubusercontent.com/Vesicularorb/Databases/main/";
+        const gh_new = "https://raw.githubusercontent.com/Vesicularorb/photos/main/";
+        const gh_more = "https://raw.githubusercontent.com/Vesicularorb/more/main/";
+        const gh_er = "https://raw.githubusercontent.com/Vesicularorb/er/main/";
+
+        const photoMap = {
+            "Kitahara Rie": gh_new + "2017_NGT48_Kitahara_Rie.jpg",
+            "Akamatsu Sora": gh_new + "Akamatsu_Sora_NMB48_2025.jpg",
+            "Akita Rian": gh_new + "Akita_Rian_BokuAo_Apr_2026.jpg",
+            "Akiyama Yuna": gh_new + "Akiyama_Yuna_AKB48_2025_29.jpg",
+            "Anno Aoi": gh_new + "Anno_Aoi_BokuAo_Apr_2026.jpg",
+            "Fujizono Rei": gh_new + "Fujizono_Rei_AKB48_2022.jpg",
+            "Fukuno Ami": gh_new + "Fukuno_Ami_NMB48_2025.jpg",
+            "Haga Rei": gh_new + "Haga_Rei_NMB48_2025.jpg",
+            "Hanada Mei": gh_new + "Hanada_Mei_AKB48_2026.jpg",
+            "Hasegawa Hitomi": gh_new + "Hasegawa_Hitomi_BokuAo_Apr_2026.jpg",
+            "Hayasaki Suzuki": gh_new + "Hayasaki_Suzuki_BokuAo_Apr_2026.jpg",
+            "Itagaki Koyori": gh_new + "Itagaki_Koyori_NMB48_2025.jpg",
+            "Ito Momoka": gh_new + "Ito_Momoka_AKB48_2026.jpg",
+            "Ito Yuzu": gh_new + "Ito_Yuzu_BokuAo_Apr_2026.jpg",
+            "Iwamoto Riko": gh_new + "Iwamoto_Riko_BokuAo_Apr_2026.jpg",
+            "Kanazawa Ami": gh_new + "Kanazawa_Ami_BokuAo_Apr_2026.jpg",
+            "Kawamura Yui": gh_new + "Kawamura_Yui_AKB48_2026.jpg",
+            "Kinoshita Ai": gh_new + "Kinoshita_Ai_BokuAo_May_2025.jpg",
+            "Kinugasa Ayami": gh_new + "Kinugasa_Ayami_NMB48_2025.jpg",
+            "Kondo Saki": gh_new + "Kondo_Saki_AKB48_2025.jpg",
+            "Kudo Yua": gh_new + "Kudo_Yua_BokuAo_Apr_2026.jpg",
+            "Maruyama Hinata": gh_new + "Maruyama_Hinata_AKB48_2025.jpg",
+            "Miyahara Konon": gh_new + "Miyahara_Konon_NMB48_2025.jpg",
+            "Miyakoshi Yuria": gh_new + "Miyakoshi_Yuria_BokuAo_Apr_2026.jpg",
+            "Miyamoto Ami": gh_new + "Miyamoto_Ami_NMB48_2025.jpg",
+            "Mochinaga Mana": gh_new + "MochinagaMana-Nov2025.jpg",
+            "Nishimori Aya": gh_new + "Nishimori_Aya_BokuAo_Apr_2026.jpg",
+            "Nishizumi Misaki": gh_new + "Nishizumi_Misaki_NMB48_2025.jpg",
+            "Okumoto Kairi": gh_new + "Okumoto_Kairi_AKB48_2026.jpg",
+            "Sadano Haruka": gh_new + "Sadano_Haruka_NMB48_2023.jpg",
+            "Sakaguchi Nagisa": gh_new + "Sakaguchi_Nagisa_January_2024.jpg",
+            "Sato Masaki": gh_new + "SatoMasaki-15Thankyoutoo.jpg",
+            "Shiogama Nana": gh_new + "Shiogama_Nana_BokuAo_Apr_2026.jpg",
+            "Shiratori Sari": gh_new + "Shiratori_Sari_AKB48_2026.jpg",
+            "Sunaga Miuna": gh_new + "Sunaga_Miuna_BokuAo_Apr_2026.jpg",
+            "Takahashi Juna": gh_new + "Takahashi_Juna_NMB48_2025.jpg",
+            "Takeda Kyoka": gh_new + "Takeda_Kyoka_NMB48_2025.jpg",
+            "Tanaka Misora": gh_new + "Tanaka_Misora_NMB48_2025.jpg",
+            "Tanaka Rei": gh_new + "Tanaka_Rei_NMB48_2025.jpg",
+            "Yabuuchi Hinata": gh_new + "Yabuuchi_Hinata_NMB48_2025.jpg",
+            "Yaegashi Miisa": gh_new + "Yaegashi_Miisa_BokuAo_Apr_2026.jpg",
+            "Yagi Toa": gh_new + "Yagi_Toa_BokuAo_Apr_2026.jpg",
+            "Yanagihori Karen": gh_new + "Yanagihori_Karen_BokuAo_Apr_2026.jpg",
+            "Yoshimoto Cocona": gh_new + "Yoshimoto_Cocona_BokuAo_Apr_2026.jpg",
+            "Zenke Yurika": gh_new + "Zenke_Yurika_NMB48_2025.jpg",
+            "Kurihara Sae": gh_main + "2018_HKT48_Kurihara_Sae.jpg",
+            "Oda Erina": gh_main + "2019Odaerina.jpg",
+            "Fuchigami Mai": gh_main + "280px-FuchigamiMaiKIV2019.jpg",
+            "Kaki Haruka": gh_main + "280px-KakiDebut.jpg",
+            "Kakizaki Memi": gh_main + "280px-KakizakiMemiHinatazaka46.jpg",
+            "Kamimura Hinano": gh_main + "280px-KamimuraHinanoHinatazaka46.jpg",
+            "Kawata Hina": gh_main + "280px-KawataHinaHinatazaka46.jpg",
+            "Kitagawa Yuri": gh_main + "280px-KitagawaDebut.jpg",
+            "Oguri Yui": gh_main + "280px-OguriYui8June2019.png",
+            "Sato Shiori": gh_main + "280px-SatoShiori8June2019.png",
+            "Seimiya Rei": gh_main + "280px-SeimiyaDebut.jpg",
+            "Shibata Yuna": gh_main + "280px-ShibataDebut.jpg",
+            "Shitao Miu": gh_main + "280px-ShitaoMiu8June2019.png",
+            "Tsutsui Ayame": gh_main + "280px-TsutsuiDebut.jpg",
+            "Unjo Hirona": gh_main + "280px-UnjoHironaKIV2019.jpg",
+            "Yakubo Mio": gh_main + "280px-YakuboDebut.jpg",
+            "Yoshikawa Nanase": gh_main + "480px-YoshikawaNanase8July2018.jpg",
+            "Akiyoshi Yuka": gh_main + "482px-AkiyoshiYukaH2017.jpg",
+            "Harada Aoi": gh_main + "493px-HaradaFutari.jpg",
+            "Koike Minami": gh_main + "493px-KoikeFutari.jpg",
+            "Moriya Akane": gh_main + "493px-MoriyaFutari.jpg",
+            "Nagahama Neru": gh_main + "493px-NagahamaFutari.jpg",
+            "Sugai Yuuka": gh_main + "493px-SugaiFutari.jpg",
+            "Uemura Rina": gh_main + "493px-UemuraFutari.jpg",
+            "Abe Natsumi": gh_main + "Abe.jpg",
+            "Abe Maria": gh_main + "AbeMariaK2015.jpg",
+            "Arai Sae": gh_main + "Arai_Sae_AKB48_2023_29.jpg",
+            "Asao Momoka": gh_main + "Asao_Momoka_NMB48_2023.jpg",
+            "Cho Kurena": gh_main + "ChoKurenaA2018.jpg",
+            "Deguchi Yuina": gh_main + "Deguchi_Yuina_NMB48_2023.jpg",
+            "Endo Sakura": gh_main + "EndoDebut.jpg",
+            "Fukamura Mizuki": gh_main + "FukumuraMizuki.jpg",
+            "Niigaki Risa": gh_main + "Gaki.jpg",
+            "Goto Maki": gh_main + "Goto.jpg",
+            "Hama Sayuna": gh_main + "HamaSayuna8June2019.png",
+            "Hara Karen": gh_main + "Hara_Karen_NMB48_2023.jpg",
+            "Hashimoto Eriko": gh_main + "Hashimoto_Eriko_AKB48_2023.jpg",
+            "Hidaritomo Ayaka": gh_main + "HidaritomoAyaka82017.jpg",
+            "Morita Hikaru": gh_main + "Hikaru.jpg",
+            "Hirano Momona": gh_main + "HiranoMomonaKKS2018.jpg",
+            "Hiwatashi Yui": gh_main + "HiwatashiYuiB2019.jpg",
+            "Hongo Yuzuha": gh_main + "Hongo_Yuzuha_NMB48_2023.jpg",
+            "Hori Miona": gh_main + "HoriSynchronicity.jpg",
+            "Hoshino Minami": gh_main + "HoshinoMinami.jpg",
+            "Hotei Moka": gh_main + "Hotei_Moka_AKB48_2023.jpg",
+            "Iida Kaori": gh_main + "Iida.jpg",
+            "Ikuta Erika": gh_main + "IkutaErika.jpg",
+            "Imaizumi Yui": gh_main + "Imaizumi.jpg",
+            "Iikubo Haruna": gh_main + "Img2012121201432945.jpg",
+            "Iriyama Anna": gh_main + "IriyamaAnnaA2013.jpg",
+            "Ishibashi Ibuki": gh_main + "Ishibashi_Ibuki_HKT48_2022.jpg",
+            "Ishida Yuumi": gh_main + "Ishida_Yuumi_NMB48_2023.jpg",
+            "Ishikawa Rika": gh_main + "Ishikawa.jpg",
+            "Itano Tomomi": gh_main + "ItanoTomomi.jpg",
+            "Iwamoto Renka": gh_main + "IwamotoInfluencer.jpg",
+            "Iwatate Saho": gh_main + "IwatateSahoB2019.jpg",
+            "Jitoe Nene": gh_main + "Jitoe_Nene_HKT48_2022.jpg",
+            "Jonishi Rei": gh_main + "Jonishi_Rei_NMB48_2023.jpg",
+            "Junjun": gh_main + "Junjun_-_Kimagure_Princess_Promo.jpg",
+            "Kakehashi Sayaka": gh_main + "KakehashiDebut.jpg",
+            "Kamei Eri": gh_main + "Kamei.jpg",
+            "Kojima Karin": gh_main + "Karin.jpg",
+            "Kato Rena": gh_main + "KatoRena2016.jpg",
+            "Kawakami Chihiro": gh_main + "Kawakami_Chihiro_NMB48_2023.jpg",
+            "Masumoto Kira": gh_main + "Kira.jpg",
+            "Kitagawa Ryoha": gh_main + "KitagawaRyohaS2018.jpg",
+            "Kitano Hinako": gh_main + "KitanoHarujion.jpg",
+            "Kitano Ruka": gh_main + "KitanoRukaKII2018.jpg",
+            "Kizaki Yuria": gh_main + "KizakiYuriaB2017.jpg",
+            "Kohama Kokone": gh_main + "Kohama_Kokone_AKB48_2023.jpg",
+            "Kusumi Koharu": gh_main + "Koharu.jpg",
+            "Kojima Haruna": gh_main + "Kojima_haruna2012.jpg",
+            "Kojima Mako": gh_main + "KojimaMakoK2019.jpg",
+            "Komiyama Haruka": gh_main + "KomiyamaHarukaK2019.jpg",
+            "Konno Asami": gh_main + "KonKon.jpg",
+            "Kousaka Marino": gh_main + "Kousaka.jpg",
+            "Kubo Satone": gh_main + "KuboSatoneB2018.jpg",
+            "Sayashi Riho": gh_main + "Sayashi_01_img.jpg",
+            "Kuramochi Asuka": gh_main + "Kuramochi_asuka2012.jpg",
+            "Kuranoo Narumi": gh_main + "KuranooNarumi8June2019.png",
+            "Kuriyama Rina": gh_main + "Kuriyama_Rina_HKT48_2025_29.jpg",
+            "Kuroda Fuuwa": gh_main + "Kuroda_Fuuwa_NMB48_2023.jpg",
+            "Kuroshima Sakura": gh_main + "Kuroshima_Sakura_NMB48_2023.jpg",
+            "Lee Siyeon": gh_main + "Lee_Siyeon_NMB48_2023.jpg",
+            "Linlin": gh_main + "Linlin_coveryou.jpg",
+            "Ma Chia-Ling": gh_main + "MaChia-Ling42018.jpg",
+            "Maeda Atsuko": gh_main + "Maeda_atsuko2012.jpg",
+            "Maeda Ami": gh_main + "Maedaami.jpg",
+            "Shimizu Maria": gh_more + "Shimizu_Maria_AKB48_2020.jpg",
+            "Masai Mayuu": gh_main + "Masai_Mayuu_AKB48_2023.jpg",
+            "Matsui Jurina": gh_main + "MatsuiJurina2014.jpg",
+            "Matsui Rena": gh_main + "Matsuirenanatsu.jpg",
+            "Michishige Sayumi": gh_main + "Michi.jpg",
+            "Ichikawa Miori": gh_main + "MiorinNMB.jpg",
+            "Mitsui Aika": gh_main + "MitsuiSeishunCollection.jpg",
+            "Mizuta Shiori": gh_main + "Mizuta_Shiori_NMB48_2023.jpg",
+            "Mogi Shinobu": gh_main + "MogiShinobuK2019.jpg",
+            "Mukaichi Mion": gh_main + "MukaichiMion2016.jpg",
+            "Murayama Yuiri": gh_main + "MurayamaYuiri42019.jpg",
+            "Muto Orin": gh_main + "MutoOrinK2019.jpg",
+            "Muto Tomu": gh_main + "MutoTomuK2019.jpg",
+            "Nakazawa Yuko": gh_main + "NakazawaYuko-March2022.jpg",
+            "Yamada Nana": gh_main + "NanaJune2013.jpg",
+            "Nibu Kaze": gh_main + "NibuKaze.jpg",
+            "Nishino Hadashi": gh_main + "NishinoHadashi.jpg",
+            "Nishino Miki": gh_main + "NishinoMiki2015.jpg",
+            "Okabe Rin": gh_main + "OkabeRinA2019.jpg",
+            "Oshima Mai": gh_main + "OshimaMai.jpg",
+            "Oshima Yuko": gh_main + "Oshima_yuko2012.jpg",
+            "Owada Nana": gh_main + "OwadaNana2016.jpg",
+            "Ozono Rei": gh_main + "OzonoRei.jpg",
+            "Saito Asuka": gh_main + "SaitoAsukaKaerimichi.jpg",
+            "Sakagawa Hiyuka": gh_main + "Sakagawa_Hiyuka_AKB48_2023.jpg",
+            "Sakamoto Risa": gh_main + "Sakamoto_Risa_NMB48_2023.jpg",
+            "Sakashita Mako": gh_main + "Sakashita_Mako_NMB48_2023.jpg",
+            "Sako Yumemi": gh_main + "Sako_Yumemi_AKB48_2023_29.jpg",
+            "Sato Airi": gh_main + "Sato_Airi_AKB48_2023.jpg",
+            "Shibuya Nagisa": gh_main + "ShibuyaNagisaM2019.jpg",
+            "Shimazaki Haruka": gh_main + "ShimazakiHarukaB2013.jpg",
+            "Shinoda Mariko": gh_main + "Shinoda_mariko2012.jpg",
+            "Shinzawa Nao": gh_main + "Shinzawa_Nao_NMB48_2023.jpg",
+            "Shiraishi Mai": gh_main + "Shiraishimai_prof.jpg",
+            "Shiroma Miru": gh_main + "ShiromaMiruM2019.jpg",
+            "Suda Akari": gh_main + "SudaAkariE2017.jpg",
+            "Sumino Wakana": gh_main + "Sumino_Wakana_NMB48_2023.jpg",
+            "Suzuki img": gh_main + "Suzukiimg.jpg",
+            "Takahashi Ayane": gh_main + "TakahashiAyane8June2019.png",
+            "Takahashi Minami": gh_main + "Takahashi_minami2012.jpg",
+            "Takajo Aki": gh_main + "Takajo_aki2012.jpg",
+            "Takayama Kazumi": gh_main + "TakayamaKaerimichi.jpg",
+            "Tamura Debut": gh_main + "TamuraDebut.jpg",
+            "Tamura Hono": gh_main + "TamuraHono.jpg",
+            "Tanaka Miku": gh_main + "TanakaMikuH2018.jpg",
+            "Tanaka Yukino": gh_main + "Tanaka_Yukino_NMB48_2023.jpg",
+            "Taniguchi Megu": gh_main + "TaniguchiMeguB2019.jpg",
+            "Tanikawa Hijiri": gh_main + "TanikawaHijiriA2018.jpg",
+            "Tano Yuka": gh_main + "TanoYukaK2017.jpg",
+            "Tatsumoto Yayoi": gh_main + "Tatsumoto_Yayoi_NMB48_2023.jpg",
+            "Umeda Ayaka": gh_main + "Umeda_ayaka2012.jpg",
+            "Umeyama Cocona": gh_main + "UmeyamaCoconaBII2019.jpg",
+            "Umezawa Minami": gh_main + "UmezawaKaerimichi.jpg",
+            "Wada Miyu": gh_main + "Wada_Miyu_NMB48_2023.jpg",
+            "Watanabe Mayu": gh_main + "WatanabeMayu2016.jpg",
+            "Watanabe Miho": gh_main + "WatanabeMiho6th.jpg",
+            "Yabuki Nako": gh_main + "YabukiNakoH2018.jpg",
+            "Yagami Kumi": gh_main + "Yagami_kumi.jpg",
+            "Yagura Fuuko": gh_main + "YaguraFuuko2014Shuffle.jpg",
+            "Yahagi Moeka": gh_main + "YahagiMoekaK2019.jpg",
+            "Yajima Maimi": gh_main + "YajimaMaimi2018November.jpg",
+            "Yamaguchi Yui": gh_main + "Yamaguchi_Yui_AKB48_2023_29.jpg",
+            "Yamamoto Sayaka": gh_main + "YamamotoSayakaK2015.jpg",
+            "Yamashita Mizuki": gh_main + "YamashitaKaerimichi.jpg",
+            "Yamauchi Mizuki": gh_main + "YamauchiMizuki42018.jpg",
+            "Yoda Yuuki": gh_main + "YodaKaerimichi.jpg",
+            "Yokono Sumire": gh_main + "Yokono_Sumire_NMB48_2020.jpg",
+            "Yokoyama Yui": gh_main + "YokoyamaYui2016.jpg",
+            "Yoshida Akari": gh_main + "YoshidaAkariM2017.jpg",
+            "Ito Miki": gh_main + "ito_miki.jpg",
+            "Usa": gh_main + "large_宇咲.jpg",
+            "Takanashi Rui": gh_main + "large_小鳥遊るい.jpg",
+            "Ota Aika": gh_main + "oota_aika.jpg",
+            "Sashihara Rino": gh_main + "sashihara_rino.jpg",
+            "Suzumoto Miyu": gh_more + "2019_Kuroi_Hitsuji_Suzumoto_Miyu.jpg",
+            "Nagasawa Nanako": gh_more + "2020_Nagasawa_Nanako.jpg",
+            "Akimoto Manatsu": gh_more + "Akimoto_Manatsu_Kimi_ni_Shikarareta.jpg",
+            "Endo Riko": gh_more + "Endo_Riko.jpg",
+            "Futamura Haruka": gh_more + "Futamura.jpg",
+            "Yamauchi Yuna": gh_more + "HKT%20Yuna.jpg",
+            "Higashimura Mei": gh_more + "HigashimuraMei.jpg",
+            "Hirate Yurina": gh_more + "HirateYurina.jpg",
+            "Iguchi Mao": gh_more + "IguchiMao.jpg",
+            "Ikeda Teresa": gh_more + "Ikeda_Teresa_N46_Mar_2026.jpg",
+            "Inoue Nagi": gh_more + "Inoue_Nagi_N46_Mar_2026.jpg",
+            "Ioki Mao": gh_more + "Ioki_Mao_N46_Mar_2026.jpg",
+            "Ishida Anna": gh_more + "Ishida.jpg",
+            "Kato Shiho": gh_more + "KatoShiho.jpg",
+            "Kawabata Hina": gh_more + "Kawabata_Hina_N46_Mar_2026.jpg",
+            "Kawasaki Sakura": gh_more + "Kawasaki_Sakura_N46_Mar_2026.jpg",
+            "Kosaka Nao": gh_more + "KosakaNao6th.jpg",
+            "Kubo Shiori": gh_more + "Kubo%20Shiori.jpg",
+            "Manabe Anju": gh_more + "Manabe_Anju_NMB48_2023.jpg",
+            "Masuda Mirine": gh_more + "Masuda_Mirine_N46_Mar_2026.jpg",
+            "Matsuda Konoka": gh_more + "MatsudaKonoka1stAlbum.jpg",
+            "Matsuda Rina": gh_more + "Matsuda_Rina_S46_Feb_2026.jpg",
+            "Matsuo Sakura": gh_more + "Matsuo_Sakura.jpg",
+            "Miyachi Sumire": gh_more + "Miyachi_Sumire.jpg",
+            "Miyata Manamo": gh_more + "MiyataManamo.jpg",
+            "Morihira Urumi": gh_more + "Morihira_Urumi_N46_Mar_2026.jpg",
+            "Morimoto Marii": gh_more + "Morimoto_Marie_H46_Jan_2026.jpg",
+            "Nakamoto Himeka": gh_more + "N46_Nakamoto_Himeka_Sun.jpg",
+            "Nakada Kana": gh_more + "Nakada_Kana_N46_Kaerimichi.jpg",
+            "Nakanishi Aruno": gh_more + "Nakanishi_Aruno_N46_Mar_2026.jpg",
+            "Nibu Akari": gh_more + "Nibu.jpg",
+            "Nishino Nanase": gh_more + "NishinoNanase2016.jpg",
+            "Ogawa Aya": gh_more + "Ogawa_Aya_N46_Mar_2026.jpg",
+            "Ono Manami": gh_more + "Ono_Manami.jpg",
+            "Ota Yuki": gh_more + "Ota_Yuki_AKB48_2023.jpg",
+            "Ozu Reina": gh_more + "Ozu_Reina_N46_June_2025.jpg",
+            "Goto Rara": gh_more + "Rara.jpg",
+            "Sakamoto Erena": gh_more + "Sakamoto%20Erena.jpg",
+            "Sakurai Reika": gh_more + "Sakurai_Reika_N46_Synchronicity.jpg",
+            "Sasaki Mirei": gh_more + "Sasaki_Mirei.jpg",
+            "Setoguchi Mitsuki": gh_more + "Setoguchi_Mitsuki_N46_Mar_2026.jpg",
+            "Shimizu Rio": gh_more + "Shimizu_Rio.jpg",
+            "Shogenji Yoko": gh_more + "Shogenji_Yoko.jpg",
+            "Tamura Mayu": gh_more + "TamuraDebut.jpg",
+            "Tanaka Reina": gh_more + "Tanaka%20Reina.jpg",
+            "Wakatsuki Yumi": gh_more + "WakatsukiYumi2016.jpg",
+            "Watanabe Miyuki": gh_more + "WatanabeMiyuki2014.jpg",
+            "Yada Moeka": gh_more + "Yada_Moeka_N46_Mar_2026.jpg",
+            "Yagi Azuki": gh_more + "Yagi_Azuki_AKB48_2023_29.jpg",
+            "Yamaguchi Haruyo": gh_more + "Yamaguchi_Haruyo.jpg",
+            "Ten Yamasaki": gh_more + "Yamasaki_Ten_S46_Feb_2026.jpg",
+            "Yamashita Haruka": gh_more + "Yamashita_Haruka.jpg",
+            "Yamashita Shizuki": gh_more + "Yamashita_Shizuki.jpg",
+            "Baek Jiheon": gh_er + "Baek%20Jiheon.png",
+            "Eto Misa": gh_er + "EtoMisa.jpg",
+            "Eura Yuka": gh_er + "Eura_Yuka.jpg",
+            "Fujino Kokoha": gh_er + "Fujino_Kokoha.jpg",
+            "Fukagawa Mai": gh_er + "FukagawaMai.jpg",
+            "Hamagishi Hiyori": gh_er + "Hamagishi%20Hiyori.jpg",
+            "Song Hayoung": gh_er + "Hayoung.png",
+            "Higuchi Hina": gh_er + "HiguchiHina.jpg",
+            "Ichinose Kohina": gh_er + "IchinoseKohina.jpg",
+            "Kishi Miyu": gh_er + "KishiMiyu.jpeg",
+            "Kodama Haruka": gh_er + "KodamaHarukaH2016.jpg",
+            "Saeko Kondo": gh_er + "Kondo%20Saeko.jpg",
+            "Lee Nakyung": gh_er + "Lee%20Nakyung.png",
+            "Lee Saerom": gh_er + "Lee%20Saerom.png",
+            "Morisaki Saaya": gh_er + "Morisaki_Saaya.jpg",
+            "Motomura Aoi": gh_er + "Motomura_Aoi.jpg",
+            "Nakajima Saki": gh_er + "Nakajima%20Saki.jpg",
+            "Ozono Momoko": gh_er + "OzonoMomoko.jpg",
+            "Roh Jisun": gh_er + "Roh%20Jisun.png",
+            "Ryuto Ayane": gh_er + "Ryuto_Ayane.jpg",
+            "Matsumura Sayuri": gh_er + "Sayuri.jpg",
+            "Shibui Mina": gh_er + "Shibui_Mina.jpg",
+            "Suzuki Airi": gh_er + "SuzukiAiri.jpg",
+            "Takahashi Ai": gh_er + "TakahashiAi.jpg",
+            "Tashima Meru": gh_er + "TashimaMeru.jpg",
+            "Morihara Urumi": gh_er + "Urumi.jpg",
+            "Yamashita Emiri": gh_er + "Yamashita_Emiri.jpg",
+            "Yanase Reia": gh_er + "Yanase_Reia.jpg",
+            "Nagata Shiori": gh_er + "Nagata_Shiori.jpg",
+            "Omori Rio": gh_er + "Ohmori_rio.jpg",
+            "Okada Ayame": gh_er + "OkadaAyame.jpg",
+            "Tsurumi Moe": gh_er + "Tsurumi_Moe.jpg",
+            "Hiruta Airi": gh_er + "Hirutaairi.jpg",
+            "Ishihama Mei": gh_er + "Ishihamamei.jpg",
+            "Seiji Reina": gh_er + "Seiji_Reina.jpg",
+            "Otsuka Nanami": gh_er + "Otsuka_Nanami.jpg",
+            "Sugimoto Moe": gh_er + "Sugimoto_Moe.jpg",
+            "Sato Hiroka": gh_er + "Sato_Hiroka.jpg",
+            "Suto Rinka": gh_er + "Suto_Rinka.jpg",
+            "Suzuki Ririka": gh_er + "Suzuki_Ririka.jpg",
+            "Honda Miyuki": gh_er + "Honda_Miyuki.jpg",
+            "Ochiai Kirari": gh_er + "Ochiai_Kirari.jpg",
+            "Fu Yaning": gh_more + "Yaning..jpg",
+            "Sakamoto Mashiro": gh_more + "Mashiro..jpg",
+            "Yeseo": gh_more + "Yeseo..jpg",
+            "Kang Hyewon": gh_more + "Kang_Hyewon.jpg",
+            "Yujeong": gh_more + "YUJEONG.jpg",
+            "Hina": gh_more + "HINA.jpg",
+            "Kim Nayoung": gh_more + "NAYOUNG.jpg",
+            "Sangah": gh_more + "SANGAH.jpg",
+            "Kim Chaewon": gh_more + "Kim_Chaewon.jpg",
+            "Choi Yena": gh_more + "Choi_Yena.jpg",
+            "Jang Wonyoung": gh_more + "IVE_Jang_Wonyoung.jpg",
+            "Ahn Yujin": gh_more + "IVE_An_Yujin.jpg",
+            "Mineyoshi Arisa": gh_more + "Mineyoshi_Arisa.jpg",
+            "Shintani Nonoka": gh_more + "2018_STU48_Shintani_Nonoka.jpg",
+            "Iwata Hina": gh_more + "Iwata_Hina.jpg",
+            "Okuda Yuina": gh_more + "Okuda_Yuina.jpg",
+            "Okada Azumi": gh_more + "Okada_Azumi.jpg",
+            "Okamura Rio": gh_more + "Okamura_Rio.jpg",
+            "Kurushima Yuka": gh_more + "Kurushima_Yuka.jpg",
+            "Morokuzu Noa": gh_more + "Morokuzu_Noa.jpg",
+            "Takao Sayaka": gh_more + "Takao_Sayaka.jpg",
+            "Kudo Riko": gh_more + "Kudo_Riko.jpg",
+            "Saito Makiko": gh_more + "Saito_makiko.jpg",
+            "Shibata Aya": gh_more + "Shibata_Aya.jpg",
+            "Kumazaki Haruka": gh_more + "Kumazaki_Haruka.jpg",
+            "Aoumi Hinano": gh_more + "Aoumi_Hinano.jpg",
+            "Kurashima Ami": gh_more + "Kurashima_Ami.jpg",
+            "Iriuchijima Sayaka": gh_more + "Iriuchijima_Sayaka.jpg",
+            "Sugimoto Rina": gh_more + "Sugimoto_Riina.jpg",
+            "Hara Yune": gh_more + "Hara_Yune.jpg",
+            "Omura Anzu": gh_more + "Omura_Anzu.jpg",
+            "Morimoto Kurumi": gh_more + "Morimoto_Kurumi.jpg",
+            "Hayashi Mirei": gh_more + "Hayashi_Mirei.jpg",
+            "Hasegawa Miyabi": gh_more + "Hasegawa_Miyabi_SKE48_2025_29.jpg",
+            "Oba Mina": gh_more + "2018_SKE48_Oba_Mina.jpg",
+            "Nakamura Izumi": gh_more + "Nakamura_Izumi.jpg",
+            "Sakaguchi Tamami": gh_er + "Sakaguchi_Tamami.jpg",
+            "Yasuda Momone": gh_er + "Yasuda_Momone.jpg",
+            "Yamao Rina": gh_er + "NMB48_Yamao_Rina.jpg",
+            "Oda Sakura": gh_er + "OdaSakura.jpg",
+            "Fujimoto Miki": gh_er + "Fujimoto_Miki.jpg",
+            "Jeonghwa": gh_er + "jeonghwa.jpg",
+            "Hani": gh_er + "hani.jpg",
+            "Kurosaka Miu": gh_er + "Kurosaka_Miu.jpg",
+            "Fukuda Akari": gh_er + "Fukuda_Akari.jpg",
+            "Takayanagi Akane": gh_er + "Takayanagi_Akane.jpg",
+            "Obata Yuna": gh_er + "ObataYuna.jpg",
+            "Yamamura Sakura": gh_er + "Yamamura_Sakura.jpg",
+            "Hirao Honoka": gh_er + "Hirao_Honoka.jpg",
+            "Park Choa": gh_er + "Park_Choa.jpg",
+            "Hirata Yuki": gh_er + "Hirata_Yuki.jpg"
+        };
+
+        const idolData = {
+            "AKB48": ["Maeda Atsuko","Oshima Yuko","Watanabe Mayu","Hotei Moka","Shinoda Mariko","Itano Tomomi","Mukaichi Mion","Shimizu Maria","Yamauchi Mizuki","Takahashi Minami","Kuramochi Asuka","Yokoyama Yui","Shimazaki Haruka","Iriyama Anna","Ichikawa Miori","Komiyama Haruka","Muto Tomu","Tano Yuka","Kato Rena","Takajo Aki","Kitahara Rie","Oguri Yui","Taniguchi Megu","Fujizono Rei","Arai Sae","Akiyama Yuna","Yagi Azuki","Yamaguchi Yui","Ito Momoka","Kubo Satone","Hiwatashi Yui","Owada Nana","Murayama Yuiri","Hashimoto Eriko","Sato Airi","Okumoto Kairi","Hanada Mei","Maruyama Hinata","Shiratori Sari","Kondo Saki","Shitao Miu","Iwatate Saho","Okabe Rin","Kawamura Yui","Mogi Shinobu","Muto Orin","Ma Chia-Ling","Oda Erina","Yoshikawa Nanase","Hama Sayuna","Sakaguchi Nagisa","Takahashi Ayane","Hidaritomo Ayaka","Kohama Kokone","Sato Shiori","Cho Kurena","Abe Maria","Masai Mayuu","Sako Yumemi","Ota Yuki","Sakagawa Hiyuka","Nishino Miki","Hirata Yuki"],
+            "Morning Musume": ["Iida Kaori","Abe Natsumi","Ishikawa Rika","Goto Maki","Konno Asami","Niigaki Risa","Kamei Eri","Junjun","Kusumi Koharu","Iikubo Haruna","Michishige Sayumi","Takahashi Ai","Tanaka Reina","Fukamura Mizuki","Sato Masaki","Nakazawa Yuko","Linlin","Sayashi Riho","Fujimoto Miki","Oda Sakura"],
+            "Bokuao": ["Yagi Toa","Sunaga Miuna","Yanagihori Karen","Akita Rian","Yaegashi Miisa","Anno Aoi","Kanazawa Ami","Mochinaga Mana","Hasegawa Hitomi","Kinoshita Ai","Ito Yuzu","Miyakoshi Yuria","Yoshimoto Cocona","Shiogama Nana","Nishimori Aya","Hayasaki Suzuki","Iwamoto Riko","Kudo Yua"],
+            "NMB48": ["Yamamoto Sayaka","Watanabe Miyuki","Shiroma Miru","Kawakami Chihiro","Shibuya Nagisa","Jonishi Rei","Yamada Nana","Takeda Kyoka","Sakamoto Risa","Kuroshima Sakura","Sakashita Mako","Tatsumoto Yayoi","Akamatsu Sora","Miyahara Konon","Umeyama Cocona","Tanaka Misora","Tanaka Yukino","Haga Rei","Kinugasa Ayami","Itagaki Koyori","Yabuuchi Hinata","Miyamoto Ami","Nishizumi Misaki","Zenke Yurika","Tanaka Rei","Fukuno Ami","Takahashi Juna","Sadano Haruka","Yokono Sumire","Shinzawa Nao","Deguchi Yuina","Hara Karen","Asao Momoka","Sumino Wakana","Manabe Anju","Wada Miyu","Lee Siyeon","Yamao Rina","Yasuda Momone"],
+            "Nogizaka46": ["Shiraishi Mai","Hori Miona","Kubo Shiori","Kaki Haruka","Tamura Mayu","Kitano Hinako","Nakanishi Aruno","Iwamoto Renka","Umezawa Minami","Setoguchi Mitsuki","Masuda Mirine","Morihara Urumi","Yada Moeka","Kawabata Hina","Ozono Momoko","Ozu Reina","Kawasaki Sakura","Ogawa Aya","Ioki Mao","Inoue Nagi","Endo Sakura","Kakehashi Sayaka","Kitagawa Yuri","Shibata Yuna","Seimiya Rei","Tsutsui Ayame","Yakubo Mio","Yamashita Mizuki","Hoshino Minami","Akimoto Manatsu","Ikuta Erika","Eto Misa","Sakurai Reika","Takayama Kazumi","Nakada Kana","Nakamoto Himeka","Nishino Nanase","Higuchi Hina","Fukagawa Mai","Matsumura Sayuri","Wakatsuki Yumi","Ikeda Teresa","Sakaguchi Tamami"],
+            "Sakurazaka46": ["Matsuda Rina","Endo Riko","Morita Hikaru","Uemura Rina","Sugai Yuuka","Moriya Akane","Koike Minami","Ten Yamasaki","Harada Aoi","Masumoto Kira","Tamura Hono","Kousaka Marino","Yamashita Shizuki","Suzumoto Miyu"],
+            "Keyakizaka46": ["Nagahama Neru","Imaizumi Yui","Suzumoto Miyu","Nagasawa Nanako","Hirate Yurina"],
+            "Hinatazaka46": ["Kosaka Nao","Kato Shiho","Nibu Akari","Kawata Hina","Sasaki Mirei","Miyata Manamo","Watanabe Miho","Shogenji Yoko","Shimizu Rio","Kamimura Hinano","Matsuda Konoka","Morimoto Marii","Yamaguchi Haruyo","Miyachi Sumire","Iguchi Mao","Kakizaki Memi","Higashimura Mei","Hamagishi Hiyori","Yamashita Haruka","Matsuo Sakura","Ono Manami","Hirao Honoka"],
+            "SKE48": ["Suda Akari","Matsui Jurina","Nakamura Izumi","Oba Mina","Hirano Momona","Hasegawa Miyabi","Hayashi Mirei","Morimoto Kurumi","Hara Yune","Sugimoto Rina","Omura Anzu","Iriuchijima Sayaka","Kizaki Yuria","Ito Miki","Yagami Kumi","Kurashima Ami","Aoumi Hinano","Goto Rara","Futamura Haruka","Kumazaki Haruka","Shibata Aya","Kitagawa Ryoha","Saito Makiko","Kitano Ruka","Ishida Anna","Matsui Rena","Yamamura Sakura","Obata Yuna","Takayanagi Akane"],
+            "HKT48": ["Ota Aika","Kodama Haruka","Sashihara Rino","Tanaka Miku","Motomura Aoi","Akiyoshi Yuka","Tashima Meru","Fuchigami Mai","Kurihara Sae","Yamauchi Yuna","Yamashita Emiri","Sakamoto Erena","Yabuki Nako","Unjo Hirona","Ishibashi Ibuki","Jitoe Nene","Shibui Mina","Fujino Kokoha","Yanase Reia","Morisaki Saaya","Eura Yuka","Ryuto Ayane"],
+            "STU48": ["Kudo Riko","Fukuda Akari","Okada Azumi","Okuda Yuina","Okamura Rio","Kurushima Yuka","Morokuzu Noa","Iwata Hina","Shintani Nonoka","Mineyoshi Arisa","Takao Sayaka"],
+            "NGT48": ["Sato Hiroka","Sugimoto Moe","Seiji Reina","Otsuka Nanami","Suzuki Ririka","Suto Rinka"],
+            "Nijicon": ["Hiruta Airi","Ishihama Mei","Tsurumi Moe","Okada Ayame"],
+            "Bababambi": ["Kishi Miyu","Ichinose Kohina","Takanashi Rui","Usa","Saeko Kondo"],
+            "Fromis_9": ["Baek Jiheon","Lee Saerom","Roh Jisun","Song Hayoung","Lee Nakyung"],
+            "C-ute": ["Yajima Maimi","Suzuki Airi","Nakajima Saki"],
+            "K-pop": ["Sakamoto Mashiro","Yeseo","Ahn Yujin","Jang Wonyoung","Kang Hyewon","Kim Chaewon","Kim Nayoung","Sangah","Hina","Yujeong","Choi Yena","Fu Yaning","Park Choa","Hani","Jeonghwa"],
+            "Misc": ["Omori Rio","Nagata Shiori","Honda Miyuki","Ochiai Kirari","Kurosaka Miu"]
+        };
+
+        const rankingContainer = document.getElementById('ranking-container');
+        const rolodexList = document.getElementById('rolodex-list');
+        const idolPool = document.getElementById('idol-pool');
+        const tray = document.getElementById('tray');
+        const workspace = document.getElementById('workspace');
+        const toolColumn = document.getElementById('tool-column');
+        const holdingCell = document.getElementById('holding-cell');
+
+        // --- UNDO STACK ---
+        const undoStack = [];
+        let _preDragSnap = null;
+        let _commitTimer = null;
+
+        function _buildSnap() {
+            const snap = {};
+            document.querySelectorAll('.rank-target').forEach(slot => {
+                const card = slot.querySelector('.idol-card');
+                if (card) {
+                    const ta = card.querySelector('.card-note textarea');
+                    snap[slot.dataset.slot] = { name: card.dataset.name, note: ta ? ta.value : (card.dataset.note || '') };
+                }
+            });
+            snap['__holding__'] = Array.from(document.querySelectorAll('#holding-cell-pool .idol-card')).map(c => c.dataset.name);
+            return snap;
+        }
+
+        // Called at drag start — only the FIRST call per drag captures; subsequent
+        // onStart events from other Sortables for the same drag are ignored.
+        function capturePre() {
+            if (_preDragSnap) return;
+            _preDragSnap = _buildSnap();
+        }
+
+        // Called at drag end — deferred so ALL synchronous onEnd/onAdd callbacks
+        // across every Sortable finish before we push exactly ONE snapshot.
+        function commitSnap() {
+            if (!_preDragSnap) return;
+            clearTimeout(_commitTimer);
+            _commitTimer = setTimeout(() => {
+                if (!_preDragSnap) return;
+                undoStack.push(_preDragSnap);
+                _preDragSnap = null;
+                if (undoStack.length > 50) undoStack.shift();
+                const btn = document.getElementById('undo-btn');
+                btn.disabled = false;
+                btn.classList.remove('text-slate-400', 'bg-slate-700');
+                btn.classList.add('text-white', 'bg-slate-600');
+            }, 0);
+        }
+
+        // Legacy alias used by the holding-cell sort feature
+        function snapshotState() { capturePre(); commitSnap(); }
+        function undoLast() {
+            if (!undoStack.length) return;
+            // Cancel any in-flight deferred commit and wipe the pre-drag capture
+            clearTimeout(_commitTimer);
+            _preDragSnap = null;
+            const snap = undoStack.pop();
+            // Build lookup of where every card should end up in this snapshot
+            const snapRanked = {}; // name -> {slotKey, note}
+            Object.keys(snap).forEach(key => {
+                if (key === '__holding__') return;
+                snapRanked[snap[key].name] = { key, note: snap[key].note };
+            });
+            const snapHeld = new Set(snap['__holding__'] || []);
+
+            // Collect every card currently on the board or in the holding cell
+            const allActive = [
+                ...Array.from(document.querySelectorAll('.rank-target .idol-card')),
+                ...Array.from(document.querySelectorAll('#holding-cell-pool .idol-card'))
+            ];
+
+            // Move each card directly to its target destination — no intermediate hidden state
+            allActive.forEach(card => {
+                const name = card.dataset.name;
+                if (snapRanked[name]) {
+                    // Goes to a rank slot
+                    const { key, note } = snapRanked[name];
+                    const target = document.querySelector(`.rank-target[data-slot="${key}"]`);
+                    card.querySelector('img').className = 'img-rank';
+                    card.dataset.note = note || '';
+                    target.appendChild(card);
+                    attachNote(card);
+                    card.style.display = '';
+                } else if (snapHeld.has(name)) {
+                    // Goes to holding cell
+                    card.querySelector('img').className = 'img-tray';
+                    detachNote(card);
+                    document.getElementById('holding-cell-pool').appendChild(card);
+                    card.style.display = '';
+                } else {
+                    // Goes back to library — hide the placed card, show the library original
+                    detachNote(card);
+                    card.querySelector('img').className = 'img-tray';
+                    idolPool.appendChild(card);
+                    card.style.display = 'none';
+                    // Show the library copy
+                    const orig = idolPool.querySelector(`.idol-card[data-name="${name}"]`);
+                    if (orig) orig.style.display = '';
+                }
+            });
+
+            // Also restore any ranked/held cards that weren't on the board at all
+            // (cards that were in library before this snapshot but need to be placed now)
+            Object.keys(snapRanked).forEach(name => {
+                const { key, note } = snapRanked[name];
+                const target = document.querySelector(`.rank-target[data-slot="${key}"]`);
+                if (!target.querySelector('.idol-card')) {
+                    const card = document.querySelector(`.idol-card[data-name="${name}"]`);
+                    if (card) {
+                        card.querySelector('img').className = 'img-rank';
+                        card.dataset.note = note || '';
+                        target.appendChild(card);
+                        attachNote(card);
+                        card.style.display = '';
+                    }
+                }
+            });
+            snapHeld.forEach(name => {
+                const pool = document.getElementById('holding-cell-pool');
+                if (!pool.querySelector(`.idol-card[data-name="${name}"]`)) {
+                    const card = document.querySelector(`.idol-card[data-name="${name}"]`);
+                    if (card) {
+                        card.querySelector('img').className = 'img-tray';
+                        detachNote(card);
+                        pool.appendChild(card);
+                        card.style.display = '';
+                    }
+                }
+            });
+            updateRolodex();
+            if (!undoStack.length) {
+                const btn = document.getElementById('undo-btn');
+                btn.disabled = true;
+                btn.classList.add('text-slate-400', 'bg-slate-700');
+                btn.classList.remove('text-white', 'bg-slate-600');
+            }
+        }
+        document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLast(); } });
+
+        // --- HOLDING CELL SORT (Merge Sort comparisons) ---
+        function startHoldingCellSort() {
+            const cards = Array.from(document.querySelectorAll('#holding-cell-pool .idol-card'));
+            if (cards.length < 2) return;
+
+            const items = cards.map(c => ({
+                name: c.dataset.name,
+                src: c.querySelector('img').src,
+                card: c
+            }));
+
+            // Merge sort comparison queue builder
+            let comparisons = [];
+            let results = null;
+
+            function buildMergeSort(arr) {
+                if (arr.length <= 1) return Promise.resolve(arr);
+                const mid = Math.floor(arr.length / 2);
+                return buildMergeSort(arr.slice(0, mid)).then(left =>
+                    buildMergeSort(arr.slice(mid)).then(right =>
+                        merge(left, right)
+                    )
+                );
+            }
+
+            // We'll drive comparisons iteratively via a callback queue
+            let resolveCompare;
+            let totalComparisons = 0;
+            const estimatedTotal = Math.ceil(items.length * Math.log2(items.length));
+
+            function compare(a, b) {
+                return new Promise(resolve => {
+                    resolveCompare = (winner) => resolve(winner === 'a' ? -1 : 1);
+                    showComparison(a, b, totalComparisons, estimatedTotal);
+                    totalComparisons++;
+                });
+            }
+
+            async function merge(left, right) {
+                const result = [];
+                let i = 0, j = 0;
+                while (i < left.length && j < right.length) {
+                    const cmp = await compare(left[i], right[j]);
+                    if (cmp <= 0) result.push(left[i++]);
+                    else result.push(right[j++]);
+                }
+                return result.concat(left.slice(i)).concat(right.slice(j));
+            }
+
+            // Build overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'sort-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,15,28,0.82);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;';
+
+            overlay.innerHTML = `
+                <button onclick="document.getElementById('sort-overlay').remove()" style="position:absolute;top:20px;right:28px;background:rgba(255,255,255,0.08);border:1px solid #475569;color:#94a3b8;border-radius:50%;width:36px;height:36px;font-size:1.2rem;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;">✕</button>
+                <div style="color:#f59e0b;font-size:0.7rem;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:18px;">⚖ Sort Holding Cell — Pick Your Favourite</div>
+                <div id="sort-progress-bar-wrap" style="width:520px;height:4px;background:#1e293b;border-radius:4px;margin-bottom:28px;overflow:hidden;"><div id="sort-progress-bar" style="height:100%;background:#f59e0b;width:0%;transition:width 0.3s;border-radius:4px;"></div></div>
+                <div id="sort-arena" style="display:flex;align-items:center;gap:48px;"></div>
+                <div id="sort-counter" style="margin-top:22px;color:#475569;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;"></div>`;
+            document.body.appendChild(overlay);
+
+            function showComparison(a, b, done, total) {
+                const arena = document.getElementById('sort-arena');
+                const bar = document.getElementById('sort-progress-bar');
+                const counter = document.getElementById('sort-counter');
+                if (bar) bar.style.width = Math.round((done / total) * 100) + '%';
+                if (counter) counter.textContent = `Comparison ${done + 1} of ~${total}`;
+                arena.innerHTML = '';
+                [a, b].forEach((item, idx) => {
+                    const side = idx === 0 ? 'a' : 'b';
+                    const col = document.createElement('div');
+                    col.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:14px;cursor:pointer;';
+                    col.innerHTML = `
+                        <div style="border:3px solid #334155;border-radius:16px;overflow:hidden;transition:border-color 0.15s,box-shadow 0.15s;width:220px;height:300px;">
+                            <img src="${item.src}" style="width:100%;height:100%;object-fit:cover;display:block;">
+                        </div>
+                        <div style="color:#e2e8f0;font-size:0.85rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;text-align:center;max-width:220px;">${item.name}</div>
+                        <div style="background:#4f46e5;color:white;border:none;border-bottom:3px solid #312e81;border-radius:10px;padding:10px 32px;font-size:0.75rem;font-weight:900;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;">★ Pick Her</div>`;
+                    col.addEventListener('mouseenter', () => col.querySelector('div').style.borderColor = '#f59e0b');
+                    col.addEventListener('mouseleave', () => col.querySelector('div').style.borderColor = '#334155');
+                    col.addEventListener('click', () => {
+                        if (resolveCompare) resolveCompare(side);
+                    });
+                    arena.appendChild(col);
+                    if (idx === 0) {
+                        const vs = document.createElement('div');
+                        vs.style.cssText = 'color:#4f46e5;font-size:2rem;font-weight:900;';
+                        vs.textContent = 'VS';
+                        arena.appendChild(vs);
+                    }
+                });
+            }
+
+            // Run sort, then apply results
+            buildMergeSort([...items]).then(sorted => {
+                const overlay = document.getElementById('sort-overlay');
+                if (!overlay) return; // user closed it
+                overlay.remove();
+                snapshotState();
+                // Re-order holding cell pool
+                const pool = document.getElementById('holding-cell-pool');
+                sorted.forEach(item => {
+                    pool.appendChild(item.card);
+                });
+            });
+        }
+
+        // --- SHIFT TOOL VISIBILITY BASED ON TRAY HEIGHT ---
+        function updateToolColumnVisibility() {
+            const trayMinimized = tray.dataset.minimized === "true";
+            if (trayMinimized) {
+                toolColumn.classList.remove('hidden-by-tray');
+                holdingCell.classList.remove('hidden-by-tray');
+                return;
+            }
+            const trayTop = tray.getBoundingClientRect().top;
+            const toolBottom = toolColumn.getBoundingClientRect().bottom;
+            if (toolBottom > trayTop) {
+                toolColumn.classList.add('hidden-by-tray');
+            } else {
+                toolColumn.classList.remove('hidden-by-tray');
+            }
+        }
+
+        function initGrid() {
+            rankingContainer.innerHTML = "";
+            for (let i = 1; i <= 200; i++) {
+                const slot = document.createElement('div');
+                slot.className = "rank-slot shadow-lg";
+                slot.innerHTML = `<div class="rank-number-box">${i}</div><div class="rank-target" data-slot="${i}"></div>`;
+                rankingContainer.appendChild(slot);
+                if (i % 20 === 0 && i < 200) {
+                    const div = document.createElement('div');
+                    div.className = "divider-bar";
+                    rankingContainer.appendChild(div);
+                }
+            }
+        }
+
+        function updateRolodex() {
+            rolodexList.innerHTML = "";
+            for (let i = 1; i <= 200; i++) {
+                const target = document.querySelector(`.rank-target[data-slot="${i}"]`);
+                const card = target ? target.querySelector('.idol-card') : null;
+                const name = card ? card.dataset.name : "---";
+                const item = document.createElement('div');
+                item.className = "rolodex-item";
+                item.onclick = () => {
+                    const t = document.querySelector(`.rank-target[data-slot="${i}"]`);
+                    t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                };
+                item.innerHTML = `<span class="rolodex-num">${i}.</span> <span class="rolodex-name">${name}</span>`;
+                rolodexList.appendChild(item);
+            }
+        }
+
+        function pushDown(slotNum) {
+            if (slotNum >= 200) return;
+            const target = document.querySelector(`.rank-target[data-slot="${slotNum}"]`);
+            const occupant = target ? target.querySelector('.idol-card') : null;
+            if (occupant) {
+                pushDown(slotNum + 1);
+                const nextTarget = document.querySelector(`.rank-target[data-slot="${slotNum + 1}"]`);
+                if (nextTarget) nextTarget.appendChild(occupant);
+            }
+        }
+
+        function massShift(direction) {
+            const startRank = parseInt(document.getElementById('shift-target').value);
+            if (isNaN(startRank) || startRank < 1 || startRank > 200) return;
+            if (direction === 'down') {
+                let lastFull = startRank;
+                while(lastFull < 200 && document.querySelector(`.rank-target[data-slot="${lastFull}"]`).children.length > 0) { lastFull++; }
+                for (let i = lastFull; i >= startRank; i--) {
+                    const current = document.querySelector(`.rank-target[data-slot="${i}"]`);
+                    const next = document.querySelector(`.rank-target[data-slot="${i+1}"]`);
+                    const card = current ? current.querySelector('.idol-card') : null;
+                    if(card) next.appendChild(card);
+                }
+            } else if (direction === 'up') {
+                let firstGap = -1;
+                for (let j = startRank - 1; j >= 1; j--) {
+                    if (document.querySelector(`.rank-target[data-slot="${j}"]`).children.length === 0) { firstGap = j; break; }
+                }
+                if (firstGap !== -1) {
+                    for (let i = firstGap; i < startRank; i++) {
+                        const next = document.querySelector(`.rank-target[data-slot="${i+1}"]`);
+                        const current = document.querySelector(`.rank-target[data-slot="${i}"]`);
+                        const card = next ? next.querySelector('.idol-card') : null;
+                        if (card) current.appendChild(card);
+                    }
+                }
+            }
+            updateRolodex();
+        }
+
+		function renderLibrary(query = "") {
+            idolPool.innerHTML = "";
+            const q = query.toLowerCase();
+            Object.keys(idolData).forEach(group => {
+                const members = idolData[group];
+                const showList = members.filter(m => m.toLowerCase().includes(q) || group.toLowerCase().includes(q));
+                if (showList.length > 0) {
+                    const wrap = document.createElement('div');
+                    wrap.className = `group-wrapper header-${group.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+                    wrap.innerHTML = `<h2 class="font-bold uppercase mb-1 tracking-widest text-[14px]">${group}</h2>
+                        <div class="group-grid sortable-group" data-group-name="${group}">
+                        ${showList.map(name => `
+                            <div class="idol-card rounded p-1 cursor-grab" data-name="${name}" data-home-group="${group}" data-note="">
+                                <div class="card-identity">
+                                    <img src="${photoMap[name] || 'https://via.placeholder.com/68x95'}" class="img-tray">
+                                    <p class="idol-name">${name}</p>
+                                </div>
+                                <div class="card-note" style="display:none;"></div>
+                            </div>`).join('')}</div>`;
+                    idolPool.appendChild(wrap);
+                }
+            });
+            // Re-bind the new group-grids so they are draggable
+            bindLibraryDraggables();
+        }
+		function bindLibraryDraggables() {
+            // Find all the group grids we just created in the search
+            document.querySelectorAll('.sortable-group').forEach(el => {
+                // If Sortable is already on this grid, don't add it again (stops lag)
+                if (Sortable.get(el)) return; 
+                
+                new Sortable(el, {
+                    group: { name: 'ranking', pull: 'clone', put: false },
+                    animation: 0,
+                    sort: false,
+                    onStart: () => { capturePre(); workspace.classList.add('dragging-from-library'); document.body.classList.add('library-dragging'); },
+                    onEnd: (evt) => {
+                        workspace.classList.remove('dragging-from-library');
+                        document.body.classList.remove('library-dragging');
+                        const trayRect = document.getElementById('tray').getBoundingClientRect();
+                        
+                        // If girl is dropped back in the library area
+                        if (evt.originalEvent.clientY > trayRect.top) {
+                            const original = document.querySelector(`#idol-pool .idol-card[data-name="${evt.item.dataset.name}"]`);
+                            if (original) original.style.display = 'block';
+                            if (evt.to.classList.contains('rank-target')) evt.item.remove();
+                        } else {
+                            // Only commit the undo snap if the card actually landed somewhere useful
+                            commitSnap();
+                        }
+                    }
+                });
+            });
+        }
+		function attachNote(card) {
+            const noteDiv = card.querySelector('.card-note');
+            if (!noteDiv) return;
+            noteDiv.style.display = 'flex';
+            if (!noteDiv.querySelector('textarea')) {
+                const ta = document.createElement('textarea');
+                ta.placeholder = 'Add a note...';
+                ta.value = card.dataset.note || '';
+                ta.addEventListener('input', () => { card.dataset.note = ta.value; });
+                // Prevent drag from starting when clicking textarea
+                ta.addEventListener('mousedown', e => e.stopPropagation());
+                noteDiv.appendChild(ta);
+            } else {
+                noteDiv.querySelector('textarea').value = card.dataset.note || '';
+            }
+        }
+
+        function detachNote(card) {
+            const noteDiv = card.querySelector('.card-note');
+            if (noteDiv) noteDiv.style.display = 'none';
+        }
+
+		function initSortables() {
+            // RANKING TARGETS CONFIG (The 200 Slots - SETUP ONCE)
+            document.querySelectorAll('.rank-target').forEach(el => {
+                new Sortable(el, {
+                    group: 'ranking',
+                    animation: 0,
+                    onMove: function (evt) {
+                        const trayRect = document.getElementById('tray').getBoundingClientRect();
+                        if (evt.draggedRect.bottom > trayRect.top) return false;
+                        return true;
+                    },
+                    onAdd: (evt) => {
+                        const slotNum = parseInt(el.dataset.slot);
+                        const existingCards = Array.from(el.querySelectorAll('.idol-card')).filter(c => c !== evt.item);
+                        if (existingCards.length > 0) {
+                            const occupant = existingCards[0];
+                            pushDown(slotNum + 1);
+                            const nextTarget = document.querySelector(`.rank-target[data-slot="${slotNum + 1}"]`);
+                            if (nextTarget) nextTarget.appendChild(occupant);
+                        }
+                        if (evt.clone) {
+                            const original = document.querySelector(`#idol-pool .idol-card[data-name="${evt.item.dataset.name}"]`);
+                            if (original) original.style.display = 'none';
+                        }
+                        evt.item.querySelector('img').className = 'img-rank';
+                        attachNote(evt.item);
+                        updateRolodex();
+                    },
+                    onStart: (evt) => {
+                        capturePre();
+                        detachNote(evt.item);
+                    },
+                    onEnd: (evt) => {
+                        // If still in a rank-target, re-show the note
+                        if (evt.item.closest('.rank-target')) {
+                            attachNote(evt.item);
+                        }
+                        const trayRect = document.getElementById('tray').getBoundingClientRect();
+                        if (evt.originalEvent.clientY > trayRect.top) {
+                            const name = evt.item.dataset.name;
+                            const original = document.querySelector(`#idol-pool .idol-card[data-name="${name}"]`);
+                            if (original) original.style.display = 'block';
+                            evt.item.remove();
+                        }
+                        updateRolodex();
+                        commitSnap();
+                    }
+                });
+            });
+            // Initial bind for the library
+            bindLibraryDraggables();
+
+            // Holding Cell Sortable
+            new Sortable(document.getElementById('holding-cell-pool'), {
+                group: 'ranking',
+                animation: 0,
+                onStart: () => { capturePre(); },
+                onAdd: (evt) => {
+                    // If dropped here from library (clone), hide the original
+                    if (evt.clone) {
+                        const original = document.querySelector(`#idol-pool .idol-card[data-name="${evt.item.dataset.name}"]`);
+                        if (original) original.style.display = 'none';
+                    }
+                    // Keep img-tray class (small size) in the holding cell, no note
+                    evt.item.querySelector('img').className = 'img-tray';
+                    detachNote(evt.item);
+                },
+                onEnd: (evt) => {
+                    // If dragged back into the library tray area, restore the library card
+                    const trayRect = document.getElementById('tray').getBoundingClientRect();
+                    if (evt.originalEvent.clientY > trayRect.top) {
+                        const name = evt.item.dataset.name;
+                        const original = document.querySelector(`#idol-pool .idol-card[data-name="${name}"]`);
+                        if (original) original.style.display = 'block';
+                        evt.item.remove();
+                    } else {
+                        commitSnap();
+                    }
+                }
+            });
+        }
+
+        function toggleTray() {
+            const openBtn = document.getElementById('header-open-btn');
+            if (tray.style.transform === 'translateY(100%)' || tray.dataset.minimized === "true") {
+                tray.style.transform = 'translateY(0)';
+                tray.dataset.minimized = "false";
+                openBtn.classList.add('hidden');
+            } else {
+                tray.style.transform = 'translateY(100%)';
+                tray.dataset.minimized = "true";
+                openBtn.classList.remove('hidden');
+            }
+            // Check visibility after toggle animation
+            setTimeout(updateToolColumnVisibility, 350);
+        }
+
+        function saveData() {
+            const data = {};
+            document.querySelectorAll('.rank-target').forEach(slot => {
+                const card = slot.querySelector('.idol-card');
+                if (card) {
+                    const ta = card.querySelector('.card-note textarea');
+                    if (ta) card.dataset.note = ta.value;
+                    data[slot.dataset.slot] = { name: card.dataset.name, note: card.dataset.note || '' };
+                }
+            });
+            localStorage.setItem('idolRankingCache', JSON.stringify(data));
+            const held = Array.from(document.querySelectorAll('#holding-cell-pool .idol-card')).map(c => c.dataset.name);
+            localStorage.setItem('idolHoldingCell', JSON.stringify(held));
+
+            const ranked = Object.keys(data).length;
+            const heldCount = held.length;
+
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#1e293b;border:2px solid #22c55e;border-radius:16px;padding:32px 36px;max-width:380px;text-align:center;box-shadow:0 0 60px rgba(34,197,94,0.3);">
+                    <div style="font-size:3rem;margin-bottom:12px;">💾</div>
+                    <h2 style="color:#22c55e;font-size:1.1rem;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Saved!</h2>
+                    <p style="color:#94a3b8;font-size:0.8rem;line-height:1.6;margin-bottom:24px;">
+                        <span style="color:#86efac;font-weight:700;">${ranked}</span> girl${ranked !== 1 ? 's' : ''} ranked &nbsp;·&nbsp;
+                        <span style="color:#86efac;font-weight:700;">${heldCount}</span> in holding cell
+                    </p>
+                    <button id="modal-save-ok" style="background:#22c55e;color:#052e16;border:none;border-bottom:3px solid #15803d;border-radius:8px;padding:10px 32px;font-weight:900;font-size:0.8rem;text-transform:uppercase;cursor:pointer;">Got it</button>
+                </div>`;
+            document.body.appendChild(modal);
+            document.getElementById('modal-save-ok').onclick = () => modal.remove();
+            modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('idolRankingCache');
+            if (saved) {
+                const data = JSON.parse(saved);
+                Object.keys(data).forEach(slotNum => {
+                    const item = data[slotNum];
+                    const target = document.querySelector(`.rank-target[data-slot="${slotNum}"]`);
+                    const card = document.querySelector(`#idol-pool .idol-card[data-name="${item.name}"]`);
+                    if (card && target) {
+                        card.querySelector('img').classList.replace('img-tray', 'img-rank');
+                        if (item.note) card.dataset.note = item.note;
+                        target.appendChild(card);
+                        attachNote(card);
+                    }
+                });
+            }
+            // Load holding cell — find each card in the library pool and move it
+            const heldRaw = localStorage.getItem('idolHoldingCell');
+            if (heldRaw) {
+                const holdingPool = document.getElementById('holding-cell-pool');
+                JSON.parse(heldRaw).forEach(name => {
+                    const card = document.querySelector(`#idol-pool .idol-card[data-name="${name}"]`);
+                    if (card) {
+                        card.style.display = '';
+                        card.querySelector('img').className = 'img-tray';
+                        detachNote(card);
+                        holdingPool.appendChild(card);
+                    }
+                });
+            }
+            updateRolodex();
+        }
+
+        function exportList() {
+            let list = "IDOL RANKER PRO - CURRENT LIST\n==============================\n\n";
+            for (let i = 1; i <= 200; i++) {
+                const target = document.querySelector(`.rank-target[data-slot="${i}"]`);
+                const card = target ? target.querySelector('.idol-card') : null;
+                if (card) {
+                    const ta = card.querySelector('.card-note textarea');
+                    const note = (ta ? ta.value : card.dataset.note || '').trim();
+                    const notePart = note ? ` - (${note})` : '';
+                    list += `${i}. ${card.dataset.name}${notePart}\n`;
+                } else {
+                    list += `${i}. ---\n`;
+                }
+            }
+            const blob = new Blob([list], { type: "text/plain" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "My_Idol_Rankings.txt";
+            link.click();
+        }
+
+        let isResizing = false;
+        document.getElementById('resizer').addEventListener('mousedown', () => isResizing = true);
+        document.addEventListener('mousemove', e => {
+            if (isResizing) {
+                let h = window.innerHeight - e.clientY;
+                if (h > 60) tray.style.height = h + 'px';
+                updateToolColumnVisibility();
+            }
+        });
+        document.addEventListener('mouseup', () => { isResizing = false; });
+
+        let searchTimeout;
+        document.getElementById('search').addEventListener('input', e => {
+            // Stop the browser from rebuilding the library immediately
+            clearTimeout(searchTimeout);
+            
+            // Wait 200ms after you stop typing to run the search
+            searchTimeout = setTimeout(() => {
+                renderLibrary(e.target.value);
+            }, 200); 
+        });
+
+	window.onload = () => {
+    initGrid();
+    renderLibrary(); 
+    initSortables(); // <--- It runs here once and never again
+    loadData();
+    updateRolodex();
+    tray.style.height = '350px';
+    updateToolColumnVisibility();
+};
+
+        function clearAll() {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#1e293b;border:2px solid #ef4444;border-radius:16px;padding:32px 36px;max-width:380px;text-align:center;box-shadow:0 0 60px rgba(239,68,68,0.4);">
+                    <div style="font-size:3rem;margin-bottom:12px;">⚠️</div>
+                    <h2 style="color:#ef4444;font-size:1.1rem;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Wipe Everything?</h2>
+                    <p style="color:#94a3b8;font-size:0.8rem;line-height:1.6;margin-bottom:24px;">This will permanently delete your rankings, holding cell, and all notes. <strong style="color:#f87171;">This cannot be undone.</strong></p>
+                    <div style="display:flex;gap:12px;justify-content:center;">
+                        <button id="modal-cancel" style="background:#334155;color:#cbd5e1;border:none;border-radius:8px;padding:10px 24px;font-weight:800;font-size:0.8rem;text-transform:uppercase;cursor:pointer;">Cancel</button>
+                        <button id="modal-confirm" style="background:#ef4444;color:white;border:none;border-bottom:3px solid #b91c1c;border-radius:8px;padding:10px 24px;font-weight:800;font-size:0.8rem;text-transform:uppercase;cursor:pointer;">Yes, Reset All</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            document.getElementById('modal-cancel').onclick = () => modal.remove();
+            document.getElementById('modal-confirm').onclick = () => {
+                localStorage.removeItem('idolRankingCache');
+                localStorage.removeItem('idolHoldingCell');
+                location.reload();
+            };
+        }
+    </script>
+</body>
+</html>
